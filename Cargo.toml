@@ -1,0 +1,102 @@
+[package]
+name = "rail2ban"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Rust reimplementation of fail2ban"
+license = "GPL-2.0-or-later"
+repository = "https://github.com/rail2ban/rail2ban"
+
+[lib]
+name = "rail2ban"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rail2ban-server"
+path = "src/bin/rail2ban-server.rs"
+
+[[bin]]
+name = "rail2ban-client"
+path = "src/bin/rail2ban-client.rs"
+
+[[bin]]
+name = "rail2ban-regex"
+path = "src/bin/rail2ban-regex.rs"
+
+[[bin]]
+name = "rail2ban-web"
+path = "src/bin/rail2ban-web.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+futures = "0.3"
+
+# Regex
+regex = "1"
+fancy-regex = "0.13"
+
+# CLI
+clap = { version = "4", features = ["derive", "string"] }
+
+# Web framework
+axum = { version = "0.7", features = ["json"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+
+# Authentication
+argon2 = { version = "0.5", features = ["std"] }
+rand = "0.8"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# IP / CIDR
+ipnet = { version = "2", features = ["serde"] }
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Errors
+thiserror = "1"
+anyhow = "1"
+
+# Unix / system
+nix = { version = "0.27", features = ["fs", "process", "signal", "user", "socket"] }
+libc = "0.2"
+
+# File watching (Linux only — declared via platform-specific dependency below)
+
+# Misc
+glob = "0.3"
+once_cell = "1"
+parking_lot = "0.12"
+indexmap = { version = "2", features = ["serde"] }
+shlex = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+inotify = "0.10"
+
+[features]
+default = []
+inotify-backend = []
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = "debuginfo"
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0
+debug = true

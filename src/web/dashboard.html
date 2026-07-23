@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rail2ban 管理面板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--text:#e0e0e0;--muted:#8b8d97;--accent:#4f9eff;--green:#4caf50;--red:#f44336;--orange:#ff9800;--radius:8px}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:18px;display:flex;align-items:center;gap:8px}
+.header .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.header .dot.offline{background:var(--red);box-shadow:0 0 8px var(--red)}
+.header-actions{display:flex;align-items:center;gap:12px}
+.header-user{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.header-user .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:600}
+.auto-refresh{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.switch{position:relative;width:36px;height:20px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:20px;transition:.3s}
+.slider:before{content:"";position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}
+input:checked+.slider{background:var(--accent)}
+input:checked+.slider:before{transform:translateX(16px)}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.card .value{font-size:28px;font-weight:600}
+.card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.card .value.red{color:var(--red)}
+.card .value.orange{color:var(--orange)}
+.card .value.green{color:var(--green)}
+.card .value.blue{color:var(--accent)}
+.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:24px;overflow:hidden}
+.section-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.section-header h2{font-size:15px}
+.section-body{padding:20px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500}
+td{padding:8px 12px;border-bottom:1px solid var(--border)}
+tr:hover td{background:rgba(79,158,255,0.05)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge.red{background:rgba(244,67,54,.15);color:var(--red)}
+.badge.green{background:rgba(76,175,80,.15);color:var(--green)}
+.badge.orange{background:rgba(255,152,0,.15);color:var(--orange)}
+.badge.blue{background:rgba(79,158,255,.15);color:var(--accent)}
+.btn{padding:6px 14px;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:4px;cursor:pointer;font-size:13px;transition:.2s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.red{border-color:var(--red);color:var(--red)}
+.btn.red:hover{background:var(--red);color:white}
+.btn.green{border-color:var(--green);color:var(--green)}
+.btn.green:hover{background:var(--green);color:white}
+.btn.blue{border-color:var(--accent);color:var(--accent)}
+.btn.blue:hover{background:var(--accent);color:white}
+.btn.sm{padding:3px 8px;font-size:12px}
+.input{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-size:14px;width:100%}
+.input:focus{outline:none;border-color:var(--accent)}
+.search-box{display:flex;gap:8px;margin-bottom:16px}
+.empty{text-align:center;padding:32px;color:var(--muted);font-size:14px}
+.chart-container{height:240px;position:relative}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:420px;max-width:90vw;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:var(--radius);font-size:14px;z-index:300;transform:translateY(100px);opacity:0;transition:.3s}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:var(--green);color:white}
+.toast.error{background:var(--red);color:white}
+.toast.warn{background:var(--orange);color:white}
+.log-select{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+/* Auth screens */
+.auth-screen{display:none;min-height:100vh;align-items:center;justify-content:center}
+.auth-screen.show{display:flex}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:380px;max-width:90vw}
+.auth-card .logo{text-align:center;margin-bottom:24px}
+.auth-card .logo h1{font-size:24px;color:var(--accent)}
+.auth-card .logo p{font-size:13px;color:var(--muted);margin-top:4px}
+.auth-card .field{margin-bottom:16px}
+.auth-card .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.auth-card .btn{width:100%;padding:10px;font-size:15px;margin-top:8px}
+.auth-error{background:rgba(244,67,54,.1);border:1px solid var(--red);color:var(--red);padding:8px 12px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none}
+.auth-error.show{display:block}
+.auth-hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5}
+.pwd-rules{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6}
+.pwd-rules code{background:var(--bg);padding:1px 4px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- ===== 登录界面 ===== -->
+<div class="auth-screen" id="loginScreen">
+  <div class="auth-card">
+    <div class="logo">
+      <h1>rail2ban</h1>
+      <p>管理控制台登录</p>
+    </div>
+    <div class="auth-error" id="loginError"></div>
+    <div class="field">
+      <label>用户名</label>
+      <input class="input" id="loginUser" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input class="input" id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn blue" onclick="doLogin()">登录</button>
+    <div class="auth-hint">连续 5 次失败将被锁定 15 分钟</div>
+  </div>
+</div>
+
+<!-- ===== 首次设置界面 ===== -->
+<div class="auth-screen" id="setupScreen">
+  <div class="auth-card">
+    <div class="logo">
+      <h1>rail2ban</h1>
+      <p>首次使用 — 创建管理员账户</p>
+    </div>
+    <div class="auth-error" id="setupError"></div>
+    <div class="field">
+      <label>用户名</label>
+      <input class="input" id="setupUser" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('setupPass').focus()">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input class="input" id="setupPass" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')document.getElementById('setupPass2').focus()">
+      <div class="pwd-rules">至少 8 位，需包含大写字母、小写字母和数字</div>
+    </div>
+    <div class="field">
+      <label>确认密码</label>
+      <input class="input" id="setupPass2" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSetup()">
+    </div>
+    <button class="btn green" onclick="doSetup()">创建账户</button>
+  </div>
+</div>
+
+<!-- ===== 主面板 ===== -->
+<div id="dashboard" style="display:none">
+<div class="header">
+  <h1><span class="dot" id="statusDot"></span>rail2ban 管理面板</h1>
+  <div class="header-actions">
+    <div class="auto-refresh">
+      <span>自动刷新</span>
+      <label class="switch"><input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()"><span class="slider"></span></label>
+    </div>
+    <button class="btn sm" onclick="refreshAll()" title="刷新 (Enter)">刷新</button>
+    <button class="btn sm blue" onclick="openModal('banModal')" title="封禁 IP (Ctrl+B)">封禁</button>
+    <button class="btn sm green" onclick="openModal('unbanModal')" title="解封 IP (Ctrl+U)">解封</button>
+    <div class="header-user">
+      <span class="avatar" id="userAvatar">A</span>
+      <span id="userName">admin</span>
+    </div>
+    <button class="btn sm" onclick="openModal('pwdModal')" title="修改密码">密码</button>
+    <button class="btn sm red" onclick="doLogout()">退出</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="cards">
+    <div class="card"><div class="label">Jail 数量</div><div class="value blue" id="statJails">0</div><div class="sub">已加载的监控规则</div></div>
+    <div class="card"><div class="label">当前封禁</div><div class="value red" id="statBanned">0</div><div class="sub">活跃的封禁 IP</div></div>
+    <div class="card"><div class="label">当前失败</div><div class="value orange" id="statFailed">0</div><div class="sub">findtime 内的失败</div></div>
+    <div class="card"><div class="label">历史封禁</div><div class="value green" id="statHistBan">0</div><div class="sub">累计封禁次数</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h2>Jail 列表</h2></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th>名称</th><th>当前封禁</th><th>历史封禁</th><th>当前失败</th><th>历史失败</th><th>操作</th></tr></thead>
+        <tbody id="jailBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>封禁 IP 分布</h2>
+      <div class="log-select"><span>日志级别:</span><select id="logLevelSel" class="input" style="width:auto" onchange="setLogLevel()"></select></div>
+    </div>
+    <div class="section-body">
+      <div class="chart-container"><canvas id="banChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>已封禁 IP 列表</h2>
+      <button class="btn sm red" onclick="unbanAll()">全部解封</button>
+    </div>
+    <div class="section-body">
+      <div class="search-box">
+        <input class="input" id="searchIp" placeholder="搜索 IP 地址..." oninput="renderBannedList()">
+      </div>
+      <table>
+        <thead><tr><th>IP 地址</th><th>封禁 Jail</th><th>操作</th></tr></thead>
+        <tbody id="bannedBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>配置管理</h2>
+      <button class="btn sm blue" onclick="reloadConfig()">重载配置</button>
+    </div>
+    <div class="section-body">
+      <div id="configInfo" class="empty">加载中...</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== 封禁弹窗 ===== -->
+<div class="modal-overlay" id="banModal">
+  <div class="modal">
+    <h3>封禁 IP</h3>
+    <div class="field"><label>选择 Jail</label><select id="banJailSelect" class="input" style="width:100%"></select></div>
+    <div class="field"><label>IP 地址</label><input class="input" id="banIpInput" placeholder="例如: 1.2.3.4" onkeydown="if(event.key==='Enter')doBan()"></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('banModal')">取消</button><button class="btn red" onclick="doBan()">封禁</button></div>
+  </div>
+</div>
+
+<!-- ===== 解封弹窗 ===== -->
+<div class="modal-overlay" id="unbanModal">
+  <div class="modal">
+    <h3>解封 IP</h3>
+    <div class="field"><label>IP 地址</label><input class="input" id="unbanIpInput" placeholder="例如: 1.2.3.4" onkeydown="if(event.key==='Enter')doUnban()"></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('unbanModal')">取消</button><button class="btn green" onclick="doUnban()">解封</button></div>
+  </div>
+</div>
+
+<!-- ===== 修改密码弹窗 ===== -->
+<div class="modal-overlay" id="pwdModal">
+  <div class="modal">
+    <h3>修改密码</h3>
+    <div class="field"><label>当前密码</label><input class="input" id="oldPwd" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')document.getElementById('newPwd').focus()"></div>
+    <div class="field"><label>新密码</label><input class="input" id="newPwd" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')document.getElementById('newPwd2').focus()"><div class="pwd-rules">至少 8 位，需包含大写字母、小写字母和数字</div></div>
+    <div class="field"><label>确认新密码</label><input class="input" id="newPwd2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doChangePwd()"></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('pwdModal')">取消</button><button class="btn blue" onclick="doChangePwd()">确认修改</button></div>
+  </div>
+</div>
+
+<!-- ===== Toast 通知 ===== -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+const API = '/emc/api';
+let refreshTimer = null;
+let banChart = null;
+let jailData = [];
+let bannedData = {};
+let currentUser = '';
+
+// ===== API 调用（带认证检查） =====
+async function api(path, options = {}) {
+  try {
+    const resp = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+    if (resp.status === 401) {
+      showLoginScreen();
+      throw new Error('会话已过期，请重新登录');
+    }
+    if (resp.status === 429) {
+      const data = await resp.json();
+      throw new Error(data.message || '请求过于频繁');
+    }
+    return await resp.json();
+  } catch(e) {
+    console.error('API error:', e);
+    throw e;
+  }
+}
+
+// ===== Toast 通知 =====
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ===== HTML 转义（防止 XSS） =====
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ===== 屏幕切换 =====
+function showLoginScreen() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('setupScreen').classList.remove('show');
+  document.getElementById('loginScreen').classList.add('show');
+  stopAutoRefresh();
+}
+
+function showSetupScreen() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('loginScreen').classList.remove('show');
+  document.getElementById('setupScreen').classList.add('show');
+  stopAutoRefresh();
+}
+
+function showDashboard() {
+  document.getElementById('loginScreen').classList.remove('show');
+  document.getElementById('setupScreen').classList.remove('show');
+  document.getElementById('dashboard').style.display = 'block';
+  startAutoRefresh();
+  refreshAll();
+}
+
+// ===== 认证流程 =====
+async function checkSession() {
+  try {
+    const r = await api('/session');
+    if (!r.ok) { showLoginScreen(); return; }
+    const d = r.data;
+    if (d.setup_required && !d.authenticated) {
+      showSetupScreen();
+      return;
+    }
+    if (d.authenticated) {
+      currentUser = d.username || 'admin';
+      document.getElementById('userName').textContent = currentUser;
+      document.getElementById('userAvatar').textContent = currentUser.charAt(0).toUpperCase();
+      showDashboard();
+    } else {
+      showLoginScreen();
+    }
+  } catch(e) {
+    showLoginScreen();
+  }
+}
+
+async function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.remove('show');
+  if (!username || !password) {
+    errEl.textContent = '请输入用户名和密码';
+    errEl.classList.add('show');
+    return;
+  }
+  try {
+    const resp = await fetch(API + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      document.getElementById('loginPass').value = '';
+      currentUser = username;
+      document.getElementById('userName').textContent = currentUser;
+      document.getElementById('userAvatar').textContent = currentUser.charAt(0).toUpperCase();
+      showDashboard();
+      toast('登录成功');
+    } else {
+      errEl.textContent = r.message || '登录失败';
+      errEl.classList.add('show');
+    }
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.classList.add('show');
+  }
+}
+
+async function doSetup() {
+  const username = document.getElementById('setupUser').value.trim();
+  const password = document.getElementById('setupPass').value;
+  const password2 = document.getElementById('setupPass2').value;
+  const errEl = document.getElementById('setupError');
+  errEl.classList.remove('show');
+  if (!username || !password) {
+    errEl.textContent = '请填写所有字段';
+    errEl.classList.add('show');
+    return;
+  }
+  if (password !== password2) {
+    errEl.textContent = '两次输入的密码不一致';
+    errEl.classList.add('show');
+    return;
+  }
+  try {
+    const resp = await fetch(API + '/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      toast('管理员账户创建成功，请登录');
+      document.getElementById('setupPass').value = '';
+      document.getElementById('setupPass2').value = '';
+      document.getElementById('loginUser').value = username;
+      showLoginScreen();
+    } else {
+      errEl.textContent = r.message || '创建失败';
+      errEl.classList.add('show');
+    }
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.classList.add('show');
+  }
+}
+
+async function doLogout() {
+  try {
+    await fetch(API + '/logout', { method: 'POST' });
+  } catch(e) {}
+  showLoginScreen();
+  toast('已退出登录', 'warn');
+}
+
+async function doChangePwd() {
+  const oldPwd = document.getElementById('oldPwd').value;
+  const newPwd = document.getElementById('newPwd').value;
+  const newPwd2 = document.getElementById('newPwd2').value;
+  if (!oldPwd || !newPwd) { toast('请填写所有字段', 'error'); return; }
+  if (newPwd !== newPwd2) { toast('两次新密码不一致', 'error'); return; }
+  try {
+    const r = await api('/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+    });
+    if (r.ok) {
+      closeModal('pwdModal');
+      document.getElementById('oldPwd').value = '';
+      document.getElementById('newPwd').value = '';
+      document.getElementById('newPwd2').value = '';
+      toast('密码修改成功，请重新登录');
+      setTimeout(() => showLoginScreen(), 1500);
+    } else {
+      toast(r.message || '修改失败', 'error');
+    }
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+// ===== 状态指示器 =====
+function setStatus(online) {
+  const dot = document.getElementById('statusDot');
+  dot.className = online ? 'dot' : 'dot offline';
+}
+
+// ===== 弹窗管理 =====
+function openModal(id) {
+  document.getElementById(id).classList.add('show');
+  if (id === 'banModal') {
+    const sel = document.getElementById('banJailSelect');
+    sel.innerHTML = jailData.map(j => `<option value="${esc(j.name)}">${esc(j.name)}</option>`).join('');
+  }
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ===== 数据加载 =====
+async function loadStatus() {
+  try {
+    const r = await api('/status');
+    if (!r.ok) { setStatus(false); return; }
+    setStatus(true);
+    const d = r.data;
+    document.getElementById('statJails').textContent = d.jails_count;
+    document.getElementById('statBanned').textContent = d.total_currently_banned;
+    document.getElementById('statFailed').textContent = d.total_currently_failed;
+  } catch(e) { setStatus(false); }
+}
+
+async function loadStats() {
+  try {
+    const r = await api('/stats');
+    if (!r.ok) return;
+    const data = r.data;
+    jailData = [];
+    let totalBanned = 0, totalFailed = 0, totalHistBan = 0;
+    const tbody = document.getElementById('jailBody');
+    tbody.innerHTML = '';
+    for (const [name, stats] of Object.entries(data)) {
+      const curBan = stats.currently_banned || 0;
+      const curFail = stats.currently_failed || 0;
+      const totBan = stats.total_banned || 0;
+      const totFail = stats.total_failed || 0;
+      totalBanned += curBan;
+      totalFailed += curFail;
+      totalHistBan += totBan;
+      jailData.push({ name, currently_banned: curBan, total_banned: totBan, currently_failed: curFail, total_failed: totFail });
+      const eName = esc(name);
+      tbody.innerHTML += `<tr>
+        <td><strong>${eName}</strong></td>
+        <td><span class="badge red">${curBan}</span></td>
+        <td>${totBan}</td>
+        <td><span class="badge orange">${curFail}</span></td>
+        <td>${totFail}</td>
+        <td>
+          <button class="btn sm" onclick="restartJail('${eName}')">重启</button>
+          <button class="btn sm green" onclick="startJail('${eName}')">启动</button>
+          <button class="btn sm red" onclick="stopJail('${eName}')">停止</button>
+        </td>
+      </tr>`;
+    }
+    document.getElementById('statHistBan').textContent = totalHistBan;
+    updateChart();
+  } catch(e) {}
+}
+
+async function loadBanned() {
+  try {
+    const r = await api('/banned');
+    if (!r.ok) return;
+    bannedData = r.data || {};
+    renderBannedList();
+  } catch(e) {}
+}
+
+function renderBannedList() {
+  const search = document.getElementById('searchIp').value.toLowerCase();
+  const tbody = document.getElementById('bannedBody');
+  tbody.innerHTML = '';
+  let count = 0;
+  for (const [jail, ips] of Object.entries(bannedData)) {
+    for (const ip of ips) {
+      if (search && !ip.toLowerCase().includes(search)) continue;
+      count++;
+      const eIp = esc(ip), eJail = esc(jail);
+      tbody.innerHTML += `<tr>
+        <td><strong>${eIp}</strong></td>
+        <td><span class="badge blue">${eJail}</span></td>
+        <td><button class="btn sm green" onclick="unbanSingle('${eIp}')">解封</button></td>
+      </tr>`;
+    }
+  }
+  if (count === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">无封禁 IP</td></tr>';
+  }
+}
+
+async function loadConfig() {
+  try {
+    const r = await api('/config');
+    if (!r.ok) return;
+    const d = r.data;
+    const el = document.getElementById('configInfo');
+    el.classList.remove('empty');
+    el.innerHTML = `<table>
+      <tr><td>日志级别</td><td>${esc(d.loglevel) || '-'}</td></tr>
+      <tr><td>日志目标</td><td>${esc(d.logtarget) || '-'}</td></tr>
+      <tr><td>数据库文件</td><td>${esc(d.dbfile) || '-'}</td></tr>
+      <tr><td>最大匹配数</td><td>${d.dbmaxmatches ?? '-'}</td></tr>
+      <tr><td>清理周期</td><td>${d.dbpurgeage ?? '-'} 秒</td></tr>
+    </table>`;
+    loadLogLevels(d.loglevel);
+  } catch(e) {}
+}
+
+async function loadLogLevels(current) {
+  const sel = document.getElementById('logLevelSel');
+  const levels = ['CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG'];
+  sel.innerHTML = levels.map(l => `<option value="${l}" ${l===current?'selected':''}>${l}</option>`).join('');
+}
+
+// ===== 图表 =====
+function updateChart() {
+  const ctx = document.getElementById('banChart');
+  if (!ctx) return;
+  const labels = jailData.map(j => j.name);
+  const banned = jailData.map(j => j.currently_banned);
+  const failed = jailData.map(j => j.currently_failed);
+  if (banChart) { banChart.destroy(); }
+  banChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '当前封禁', data: banned, backgroundColor: 'rgba(244,67,54,.6)', borderColor: '#f44336', borderWidth: 1 },
+        { label: '当前失败', data: failed, backgroundColor: 'rgba(255,152,0,.6)', borderColor: '#ff9800', borderWidth: 1 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+// ===== 操作 =====
+async function doBan() {
+  const jail = document.getElementById('banJailSelect').value;
+  const ip = document.getElementById('banIpInput').value.trim();
+  if (!ip) { toast('请输入 IP', 'error'); return; }
+  try {
+    const r = await api('/ban', { method: 'POST', body: JSON.stringify({ jail, ip }) });
+    if (r.ok) { toast(`已封禁 ${ip}`); closeModal('banModal'); document.getElementById('banIpInput').value = ''; refreshAll(); }
+    else toast(r.message || '封禁失败', 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function doUnban() {
+  const ip = document.getElementById('unbanIpInput').value.trim();
+  if (!ip) { toast('请输入 IP', 'error'); return; }
+  try {
+    const r = await api('/unban', { method: 'POST', body: JSON.stringify({ ip }) });
+    if (r.ok) { toast(`已解封 ${ip}`); closeModal('unbanModal'); document.getElementById('unbanIpInput').value = ''; refreshAll(); }
+    else toast(r.message || '解封失败', 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function unbanSingle(ip) {
+  try {
+    const r = await api('/unban', { method: 'POST', body: JSON.stringify({ ip }) });
+    if (r.ok) { toast(`已解封 ${ip}`); refreshAll(); }
+    else toast(r.message, 'error', 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function unbanAll() {
+  if (!confirm('确定要解封所有 IP 吗？')) return;
+  try {
+    const r = await api('/unban-all', { method: 'POST' });
+    if (r.ok) { toast('已全部解封'); refreshAll(); }
+    else toast(r.message || '操作失败', 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function startJail(name) {
+  try {
+    const r = await api(`/jails/${name}/start`, { method: 'POST' });
+    toast(r.ok ? `已启动 ${name}` : (r.message || '操作失败'), r.ok ? 'success' : 'error');
+    refreshAll();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function stopJail(name) {
+  if (!confirm(`确定停止 jail ${name} 吗？`)) return;
+  try {
+    const r = await api(`/jails/${name}/stop`, { method: 'POST' });
+    toast(r.ok ? `已停止 ${name}` : (r.message || '操作失败'), r.ok ? 'success' : 'error');
+    refreshAll();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function restartJail(name) {
+  try {
+    const r = await api(`/jails/${name}/restart`, { method: 'POST' });
+    toast(r.ok ? `已重启 ${name}` : (r.message || '操作失败'), r.ok ? 'success' : 'error');
+    refreshAll();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function setLogLevel() {
+  const level = document.getElementById('logLevelSel').value;
+  try {
+    const r = await api('/loglevel', { method: 'POST', body: JSON.stringify({ level }) });
+    toast(r.ok ? `日志级别已设为 ${level}` : (r.message || '设置失败'), r.ok ? 'success' : 'error');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function reloadConfig() {
+  if (!confirm('确定要重载配置吗？所有 jail 将被重启。')) return;
+  try {
+    const r = await api('/reload', { method: 'POST' });
+    toast(r.ok ? `配置已重载，启动 ${r.data?.jails_started ?? 0} 个 jail` : (r.message || '重载失败'), r.ok ? 'success' : 'error');
+    refreshAll();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ===== 自动刷新 =====
+function toggleAutoRefresh() {
+  if (document.getElementById('autoRefresh').checked) startAutoRefresh();
+  else stopAutoRefresh();
+}
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(() => {
+    // 暂停刷新：模态框打开时或登录/设置界面显示时
+    if (document.querySelector('.modal-overlay.show')) return;
+    if (document.getElementById('dashboard').style.display === 'none') return;
+    refreshAll();
+  }, 5000);
+}
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+function refreshAll() {
+  // 并行加载所有数据（减少延迟）
+  Promise.all([loadStatus(), loadStats(), loadBanned(), loadConfig()]).catch(() => {});
+}
+
+// ===== 键盘快捷键 =====
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'b') { e.preventDefault(); if (document.getElementById('dashboard').style.display !== 'none') openModal('banModal'); }
+  if (e.ctrlKey && e.key === 'u') { e.preventDefault(); if (document.getElementById('dashboard').style.display !== 'none') openModal('unbanModal'); }
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+  }
+  if (e.key === 'Enter' && !e.target.matches('input, textarea, select')) {
+    if (document.getElementById('dashboard').style.display !== 'none') refreshAll();
+  }
+});
+
+// ===== 启动 =====
+checkSession();
+</script>
+</body>
+</html>
